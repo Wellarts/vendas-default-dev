@@ -93,6 +93,10 @@ class ParametroResource extends Resource
                             ->label('Ativar Catálogo Público')
                             ->default(false)
                             ->columnSpan(1),
+                        Forms\Components\Toggle::make('ativar_notificacoes')
+                            ->label('Ativar Notificações de Contas a Pagar e Receber')
+                            ->default(false)
+                            ->columnSpan(1),
                         Forms\Components\Textarea::make('notificar_usuario')
                             ->label('Mensagem de Notificação ao Usuário')
                             ->autosize()

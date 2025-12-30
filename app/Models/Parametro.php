@@ -23,6 +23,7 @@ class Parametro extends Model
         'ativo',
         'notificar_usuario',
         'catalogo',
+        'ativar_notificacoes',
     ];
 
     protected $casts = [
