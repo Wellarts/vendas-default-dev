@@ -71,6 +71,7 @@ class ParametroResource extends Resource
                             ->columnSpan('full'),
                     ]),
                 Forms\Components\Section::make('Configurações do Sistema')
+                    ->visible(fn (): bool => auth()->user()->hasRole('TI'))
                     ->schema([
                         Forms\Components\TextInput::make('versao_sistema')
                             ->label('Versão do Sistema')
@@ -85,10 +86,7 @@ class ParametroResource extends Resource
                             ->label('Detalhes da Atualização')
                             ->nullable()
                             ->columnSpan('full'),
-                        Forms\Components\Toggle::make('ativo')
-                            ->label('Ativo')
-                            ->default(true)
-                            ->columnSpan(1),
+                        
                         Forms\Components\Toggle::make('catalogo')
                             ->label('Ativar Catálogo Público')
                             ->default(false)
@@ -97,12 +95,20 @@ class ParametroResource extends Resource
                             ->label('Ativar Notificações de Contas a Pagar e Receber')
                             ->default(false)
                             ->columnSpan(1),
-                        Forms\Components\Textarea::make('notificar_usuario')
-                            ->label('Mensagem de Notificação ao Usuário')
-                            ->autosize()
-                            ->nullable()
-                            ->columnSpan('full'),
-                    ])->columns(2),
+                        ]),
+                    Forms\Components\Section::make('Notificações para o Usuário')
+                        ->visible(fn (): bool => auth()->user()->hasRole('TI'))
+                        ->schema([
+                            Forms\Components\Toggle::make('ativar_notificacao_usuario')
+                                ->label('Ativar Notificações ao Usuário')
+                                ->default(true)
+                                ->columnSpan(1),
+                            Forms\Components\Textarea::make('notificar_usuario')
+                                ->label('Mensagem de Notificação ao Usuário')
+                                ->autosize()
+                                ->nullable()
+                                ->columnSpan('full'),
+                        ])->columns(2),
             ]);
     }
 
@@ -121,11 +127,12 @@ class ParametroResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn (Parametro $record): bool => auth()->user()->hasRole('TI')),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+             //       Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

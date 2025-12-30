@@ -17,6 +17,7 @@ use App\Models\ContasPagar;
 use App\Models\ContasReceber;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Mockery\Matcher\Not;
 
 class Dashboard extends \Filament\Pages\Dashboard
 {
@@ -36,6 +37,35 @@ class Dashboard extends \Filament\Pages\Dashboard
 
     public function mount(): void
     {
+
+        if(db::table('parametros')->count() == 0){
+            //cria um registro padrão na tabela parametros se não existir nenhum
+            DB::table('parametros')->insert([
+                'nome_empresa' => 'Minha Empresa',
+                'endereco_completo' => '',
+                'telefone' => '',
+                'email' => '',
+                'cnpj' => '',
+                'redes_sociais' => '',
+                'logo' => '',
+                'versao_sistema' => '1.0.0',
+                'data_atualizacao' => now(),
+                'detalhe_atualizacao' => '',
+                'ativo' => true,
+                'notificar_usuario' => '',
+                'catalogo' => false,
+                'ativar_notificacoes' => false,
+            ]);
+        }
+
+        if(db::table('parametros')->where('ativar_notificacao_usuario', '=', 1)->exists()) {
+            Notification::make()
+                ->title('Informação do Administrador')
+                ->body(db::table('parametros')->value('notificar_usuario'))
+                ->persistent()
+                ->danger()
+                ->send();
+        }
 
         if (db::table('parametros')->where('ativar_notificacoes', '=', 1)->exists()) {
 

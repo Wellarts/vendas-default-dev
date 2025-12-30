@@ -20,7 +20,7 @@ class Parametro extends Model
         'versao_sistema',
         'data_atualizacao',
         'detalhe_atualizacao',
-        'ativo',
+        'ativar_notificacao_usuario',
         'notificar_usuario',
         'catalogo',
         'ativar_notificacoes',

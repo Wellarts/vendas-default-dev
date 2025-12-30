@@ -29,20 +29,23 @@ class UserResource extends Resource
         return $form
             ->schema([
                 TextInput::make('name'),
-                    TextInput::make('email'),
-                    TextInput::make('password')
-                        ->password()
-                        ->dehydrateStateUsing(fn ($state) => Hash::make($state))
-                        ->dehydrated(fn ($state) => filled($state))
-                        ->required(fn (string $context): bool => $context === 'create'),
-                    Select::make('roles')
-                        ->multiple()
-                        ->preload()
-                        ->relationship('roles', 'name'),
-                    Select::make('permissions')
-                        ->multiple()
-                        ->preload()
-                        ->relationship('permissions', 'name'),
+                TextInput::make('email'),
+                TextInput::make('password')
+                    ->password()
+                    ->revealable()
+                    ->dehydrateStateUsing(fn($state) => $state ? Hash::make($state) : null)
+                    ->dehydrated(fn($state) => filled($state))
+                    ->required(fn(string $context): bool => $context === 'create')
+                    ->placeholder(
+                        fn(string $context): string =>
+                        $context === 'edit' ? '••••••••' : ''
+                    ),
+                Select::make('roles')
+                    ->multiple()
+                    ->label('Funções')
+                    ->preload()
+                    ->relationship('roles', 'name'),
+
 
             ]);
     }
