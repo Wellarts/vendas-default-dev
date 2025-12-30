@@ -40,8 +40,25 @@ class ProdutoResource extends Resource
                         '2xl' => 3,
                     ])
                     ->schema([
-                        Forms\Components\Hidden::make('tipo')
-                            ->default(1),
+                        Forms\Components\ToggleButtons::make('tipo')
+                            ->label('Tipo')
+                            ->default(1)
+                            ->columnSpanFull()
+                            ->options([
+                                '1' => 'Produto',
+                                '2' => 'Serviço',
+
+                            ])
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if ($state == 1) {
+                                    $set('lucratividade', 0);
+                                } elseif ($state == 2) {
+                                    $set('lucratividade', 100);
+                                }
+                            })
+
+                            ->grouped(),
                         Forms\Components\TextInput::make('nome')
                             ->required()
                             ->maxLength(255),
@@ -80,15 +97,15 @@ class ProdutoResource extends Resource
                                 if ($get('tipo') == 1 && (float)$get('lucratividade') > 0) {
                                     $set('valor_venda', ((((float)$get('valor_compra') * (float)$get('lucratividade')) / 100) + (float)$get('valor_compra')));
                                 }
-                            }),                               
+                            }),
                         Forms\Components\TextInput::make('lucratividade')
                             ->label('Lucratividade (%)')
                             ->default(0)
                             ->live(onBlur: true)
                             ->afterStateUpdated(function (Get $get, Set $set) {
                                 if ($get('tipo') == 1 && (float)$get('valor_compra') > 0) {
-                                     $set('valor_venda', ((((float)$get('valor_compra') * (float)$get('lucratividade')) / 100) + (float)$get('valor_compra')));
-                                }                               
+                                    $set('valor_venda', ((((float)$get('valor_compra') * (float)$get('lucratividade')) / 100) + (float)$get('valor_compra')));
+                                }
                             }),
                         Forms\Components\TextInput::make('valor_venda')
                             ->label('Valor Venda')
@@ -173,12 +190,20 @@ class ProdutoResource extends Resource
                                 ->danger()
                                 ->send();
                             $action->cancel();
-
                         }
                     }),
             ])
+            ->headerActions([
+                Tables\Actions\Action::make('catalogo')
+                    ->label('Catálogo')
+                    ->disabled(fn () => !\App\Models\Parametro::first() || !\App\Models\Parametro::first()->catalogo)
+                    ->url(route('catalogo'))
+                    ->icon('heroicon-s-shopping-bag')
+                    ->openUrlInNewTab()
+                    ->color('success'),
+            ])
             ->bulkActions([
-              //  Tables\Actions\DeleteBulkAction::make(),
+                //  Tables\Actions\DeleteBulkAction::make(),
                 ExportBulkAction::make(),
 
 

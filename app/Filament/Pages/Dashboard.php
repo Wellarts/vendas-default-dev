@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use App\Models\ContasPagar;
 use App\Models\ContasReceber;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class Dashboard extends \Filament\Pages\Dashboard
 {
@@ -35,6 +36,27 @@ class Dashboard extends \Filament\Pages\Dashboard
 
     public function mount(): void
     {
+
+       
+            $param = DB::table('parametros')->first();
+            dd( $param );
+            if ($param->ativo == 0 ) {
+                $message = $param->notificar_usuario ?? '';
+              //  dd( $message );
+                Notification::make()
+                    ->title('ATENÇÃO')
+                    ->persistent()
+                    ->danger()
+                    ->body($message)
+                    ->actions([
+                        Action::make('sair')
+                            ->button()
+                            ->color('danger')
+                            ->url(url('/logout')),
+                    ])
+                    ->send();
+            }
+        
 
         // Notification::make()
         //     ->title('ATENÇÃO')

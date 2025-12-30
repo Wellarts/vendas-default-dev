@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LucratividadePDVPdfController;
 use App\Http\Controllers\ContasReceberReportController;
 use App\Http\Controllers\FluxoCaixaReportController;
+use App\Http\Controllers\CatalogoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,3 +42,4 @@ Route::get('/relatorio-vendas-por-cliente', [VwTotalVendasPorClienteReportContro
 Route::get('/relatorio-contas-pagar-pdf', [ContasPagarReportController::class, 'pdf'])->name('relatorio.contas.pagar.pdf'); 
 Route::get('/relatorio-contas-receber-pdf', [ContasReceberReportController::class, 'pdf'])->name('relatorio.contas.receber.pdf');
 Route::get('/relatorio-fluxo-caixa-pdf', [FluxoCaixaReportController::class, 'pdf'])->name('relatorio.fluxo.caixa.pdf');
+Route::get('catalogo', [CatalogoController::class, 'index'])->name('catalogo');

@@ -162,25 +162,41 @@
         <!-- Cabeçalho -->
         <header class="header" style="padding-bottom: 8px; margin-bottom: 12px;">
             <table style="width:100%;">
+                @php
+                    $p = null;
+                    try {
+                        $p = DB::table('parametros')->first();
+                    } catch (Exception $e) {
+                        $p = null;
+                    }
+                    $companyName = $p->empresa_nome ?? ($p->nome_empresa ?? ($p->nome ?? 'Nome da Empresa'));
+                    $companyCnpj = $p->cnpj ?? '00.000.000/0000-00';
+                    $companyAddress = $p->endereco_completo ?? ($p->endereco ?? 'Sem Endereço Informado');
+                    $companyPhones = $p->telefone ?? ($p->telefones ?? '(00) 0000-0000');
+                    $companyInsta = $p->redes_sociais ?? ($p->redes_sociais ?? '@empresa');
+                    $logo = $p->logo ?? null;
+                @endphp
                 <tr>
                     <td style="width: 60px; vertical-align: middle;">
-                        <img src="{{ public_path('img/logo.png') }}" alt="logo" style="height: 60px;">
+                        @if(!empty($logo))
+                            <img src="{{ public_path('storage/' . $logo) }}" alt="logo" style="height: 90px;">
+                        @else
+                            <img src="{{ public_path('img/logo.png') }}" alt="logo" style="height: 90px;">
+                        @endif
                     </td>
                     <td style="text-align: right;">
                         <div class="header-info">
-                            <h2
-                                style="font-size: 1.1rem; margin: 0; color: #777f1a; font-weight: 700; line-height: 1.1;">
-                                Max Estética</h2>
+                            <h2 style="font-size: 1.1rem; margin: 0; color: #777f1a; font-weight: 700; line-height: 1.1;">
+                                {{ $companyName }}</h2>
                             <p style="font-size: 9px; color: #aaa; margin: 1px 0; line-height: 1.1;">
-                                MAXSAUDE DISTRIBUIDORA DE PRODUTOS ODONTOLOGICOS E HOSPITALARES LTDA<br>
-                                CNPJ: 53.322.401/0001-24<br>
-                                Endereço: Rua Buriti 47, Centro, Eusébio/Ceará
+                                CNPJ/CPF: {{ $companyCnpj }}<br>
+                                Endereço: {{ $companyAddress }}
                             </p>
                             <p style="font-size: 9px; color: #aaa; margin: 1px 0; line-height: 1.1;">
-                                Telefones: 85 99168-6536 / 85 99172-5715
+                                Telefones: {{ $companyPhones }}
                             </p>
                             <p style="font-size: 9px; color: #aaa; margin: 1px 0; line-height: 1.1;">
-                                Instagram: @Maxesteticaoficial
+                                Redes Sociais: {{ $companyInsta }}
                             </p>
                         </div>
                     </td>

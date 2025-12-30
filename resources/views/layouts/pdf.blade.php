@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <title>@yield('title', 'Relatório PDF')</title>
@@ -12,6 +13,7 @@
             margin: 0;
             padding: 20px;
         }
+
         .report-container {
             max-width: 850px;
             margin: auto;
@@ -20,6 +22,7 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
             padding: 30px 40px;
         }
+
         .header {
             display: flex;
             justify-content: space-between;
@@ -28,23 +31,28 @@
             padding-bottom: 18px;
             margin-bottom: 22px;
         }
+
         .header img {
             height: 60px;
         }
+
         .header-info {
             text-align: right;
         }
+
         .header-info h1 {
             font-size: 1.6rem;
             margin: 0;
             color: #2c3e50;
             font-weight: 700;
         }
+
         .header-info p {
             margin: 2px 0;
             font-size: 0.9rem;
             color: #666;
         }
+
         .section-title {
             text-align: center;
             color: #6d6d6d;
@@ -52,6 +60,7 @@
             font-weight: 600;
             margin-bottom: 8px;
         }
+
         .badge {
             display: inline-block;
             background: #777f1a;
@@ -61,6 +70,7 @@
             font-size: 0.9rem;
             font-weight: 500;
         }
+
         .info-line {
             display: flex;
             justify-content: space-between;
@@ -73,33 +83,41 @@
             border: 1px solid #eee;
             border-radius: 10px;
         }
+
         .info-item strong {
             color: #2c3e50;
             font-weight: 600;
             margin-right: 6px;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
             font-size: 0.95rem;
         }
-        th, td {
+
+        th,
+        td {
             padding: 10px 12px;
             text-align: left;
         }
+
         th {
             background: #f4f6f9;
             font-weight: 600;
             color: #2c3e50;
         }
+
         td {
             background: #fff;
             border-bottom: 1px solid #eee;
         }
+
         .text-center {
             text-align: center;
         }
+
         .summary {
             margin-top: 20px;
             font-size: 1rem;
@@ -108,25 +126,30 @@
             border: 1px solid #eee;
             border-radius: 10px;
         }
+
         .summary-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 8px;
         }
+
         .summary-row strong {
             color: #2c3e50;
             font-weight: 600;
         }
+
         .signature {
             text-align: center;
             margin-top: 40px;
         }
+
         .signature hr {
             width: 60%;
             margin: 20px auto 10px;
             border: 0;
             border-top: 1px solid #bbb;
         }
+
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -135,27 +158,50 @@
         }
     </style>
 </head>
+
 <body>
     <div class="report-container">
         <header class="header">
             <table style="width:100%;">
+                @php
+                    $p = null;
+                    try {
+                        $p = DB::table('parametros')->first();
+                    } catch (Exception $e) {
+                        $p = null;
+                    }
+                    $companyName = $p->empresa_nome ?? ($p->nome_empresa ?? ($p->nome ?? 'Nome da Empresa'));
+                    $companyCnpj = $p->cnpj ?? '00.000.000/0000-00';
+                    $companyAddress = $p->endereco_completo ?? 'Sem Endereço Informado';
+                    $companyPhones = $p->telefone ?? '(00) 0000-0000';
+                    $companyInsta = $p->redes_sociais ?? '@empresa';
+                    $logo = $p->logo;
+                    
+
+                @endphp
                 <tr>
                     <td style="width: 80px; vertical-align: middle;">
-                        <img src="{{ public_path('img/logo.png') }}" alt="logo" style="height: 80px; width: auto;">
+                        <img src="{{ public_path('storage/' . $logo) }}"
+                            alt="Logo da Empresa" style="height: 90px;">
                     </td>
                     <td style="text-align: right;">
                         <div class="header-info">
-                            <h2 style="font-size: 1.6rem; margin: 0; color: #2563eb; font-weight: 700;">@yield('title', 'Relatório')</h2>
-                            <p style="font-size: 10px; color: #aaa;">
-                                MAXSAUDE DISTRIBUIDORA DE PRODUTOS ODONTOLOGICOS E HOSPITALARES LTDA<br>
-                                CNPJ: 53.322.401/0001-24<br>
-                                Endereço: Rua Buriti 47, Centro, Eusébio/Ceará
+
+
+                            <h2 style="font-size: 1.6rem; margin: 0; color: #2563eb; font-weight: 700;">
+                                @yield('title', 'Relatório')</h2>
+                            <p style="font-size: 12px; color: #2563eb; font-weight:700; margin:6px 0 2px;">
+                                {{ $companyName }}</p>
+                            <p style="font-size: 10px; color: #aaa; margin:0;">
+                                <br>
+                                CNPJ/CPF: {{ $companyCnpj }}<br>
+                                Endereço: {{ $companyAddress }}
                             </p>
                             <p style="font-size: 10px; color: #aaa;">
-                                Telefones: 85 99168-6536 / 85 99172-5715
+                                Telefones: {{ $companyPhones }}
                             </p>
                             <p style="font-size: 10px; color: #aaa;">
-                                Instagram: @Maxesteticaoficial
+                                Redes Sociais: {{ $companyInsta }}
                             </p>
                         </div>
                     </td>
@@ -169,4 +215,5 @@
         </footer>
     </div>
 </body>
+
 </html>
