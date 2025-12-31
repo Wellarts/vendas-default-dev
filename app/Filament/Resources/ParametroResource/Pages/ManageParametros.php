@@ -10,7 +10,7 @@ class ManageParametros extends ManageRecords
 {
     protected static string $resource = ParametroResource::class;
 
-    protected static ?string $title = 'Parâmetros';
+    protected static ?string $title = 'Parâmetros';    
 
 
     protected function getHeaderActions(): array

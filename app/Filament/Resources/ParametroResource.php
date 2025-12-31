@@ -18,8 +18,13 @@ class ParametroResource extends Resource
     protected static ?string $model = Parametro::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cog';
+
     protected static ?string $navigationGroup = 'Configurações';
+
     protected static ?int $navigationSort = 1;
+
+    protected static ?string $label = 'Parâmetros';
+    
     protected static ?string $navigationLabel = 'Parâmetros';
 
 
