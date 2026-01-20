@@ -27,7 +27,6 @@ class ParametroResource extends Resource
     
     protected static ?string $navigationLabel = 'Parâmetros';
 
-
     public static function form(Form $form): Form
     {
         return $form
