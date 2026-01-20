@@ -45,20 +45,20 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-              //  Pages\Dashboard::class,
+                //  Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,
-              //  Widgets\FilamentInfoWidget::class,
+                //  Widgets\FilamentInfoWidget::class,
                 PagarHojeStatsOverview::class,
                 ReceberHojeStatsOverview::class,
-              //  VendasMesChart::class,
+                //  VendasMesChart::class,
                 VendasPDVMesChart::class,
-               // ComprasMesChart::class,
+                // ComprasMesChart::class,
                 TotalVendasPorCliente::class,
 
-               // RanckingProdutos::class,
+                // RanckingProdutos::class,
 
             ])
             ->middleware([
@@ -85,6 +85,35 @@ class AdminPanelProvider extends PanelProvider
                 config('filament-logger.activity_resource'),
 
             ])
+            ->renderHook(
+                PanelsRenderHook::FOOTER,
+                function () {
+                    $parametro = \App\Models\Parametro::first();
+                    $version = $parametro->versao_sistema ?? '1.0.0';
+
+
+                    return \Illuminate\Support\Facades\Blade::render('
+            <footer class="border-t bg-gray-50/50">
+                <div class="flex justify-end w-full px-4 py-3">
+                    <div class="flex flex-col items-end gap-2 text-xs text-gray-600 sm:flex-row sm:gap-6 sm:items-center">
+                        <span>© {{ date("Y") }} Wsys - Sistemas - Todos os direitos reservados</span>
+                        <div class="flex items-center gap-3">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+                                </svg>
+                                Versão Sistema {{ $version }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        ', [
+                        'version' => $version,
+
+                    ]);
+                }
+            )
             ->plugins([
                 FilamentErrorMailerPlugin::make(),
             ]);
