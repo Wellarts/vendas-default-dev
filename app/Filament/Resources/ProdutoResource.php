@@ -56,7 +56,6 @@ class ProdutoResource extends Resource
                             ->options([
                                 '1' => 'Produto',
                                 '2' => 'Serviço',
-
                             ])
                             ->live()
                             ->afterStateUpdated(function (Set $set, $state) {
@@ -64,81 +63,64 @@ class ProdutoResource extends Resource
                                     $set('lucratividade', 0);
                                 } elseif ($state == 2) {
                                     $set('lucratividade', 100);
+                                    $set('valor_compra', null); // Limpa valor de compra para serviços
                                 }
                             })
-
                             ->grouped(),
+                        
                         Forms\Components\TextInput::make('nome')
                             ->required()
                             ->maxLength(255),
+                        
                         Forms\Components\TextInput::make('codbar')
                             ->label('Código de Barras')
-                            ->hidden(function (Get $get) {
-                                if ($get('tipo') == 1) {
-                                    return false;
-                                } elseif ($get('tipo') == 2) {
-                                    return true;
-                                }
-                            })
+                            ->hidden(fn (Get $get) => $get('tipo') == 2)
                             ->required(false),
+                        
                         Forms\Components\TextInput::make('estoque')
                             ->numeric()
                             ->integer()
-                            ->hidden(function (Get $get) {
-                                if ($get('tipo') == 1) {
-                                    return false;
-                                } elseif ($get('tipo') == 2) {
-                                    return true;
-                                }
-                            }),
+                            ->hidden(fn (Get $get) => $get('tipo') == 2)
+                            ->default(0),
+                        
                         Forms\Components\TextInput::make('valor_compra')
                             ->label('Valor Compra')
-                            ->hidden(function (Get $get) {
-                                if ($get('tipo') == 1) {
-                                    return false;
-                                } elseif ($get('tipo') == 2) {
-                                    return true;
-                                }
-                            })
+                            ->hidden(fn (Get $get) => $get('tipo') == 2)
                             ->numeric()
+                            ->step(0.01)
                             ->live(onBlur: true)
-                            ->afterStateUpdated(function (Get $get, Set $set) {
-                                $set('valor_venda', ((((float)$get('valor_compra') * (float)$get('lucratividade')) / 100) + (float)$get('valor_compra')));
+                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                self::calcularValorVenda($get, $set);
                             }),
+                        
                         Forms\Components\TextInput::make('lucratividade')
                             ->label('Lucratividade (%)')
                             ->default(0)
+                            ->numeric()
+                            ->step(0.01)
                             ->live(onBlur: true)
-                            ->afterStateUpdated(function (Get $get, Set $set) {
-                                $set('valor_venda', ((((float)$get('valor_compra') * (float)$get('lucratividade')) / 100) + (float)$get('valor_compra')));
+                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                self::calcularValorVenda($get, $set);
                             }),
+                        
                         Forms\Components\TextInput::make('valor_venda')
                             ->label('Valor Venda')
                             ->numeric()
-                            // ->disabled(),
+                            ->step(0.01)
                             ->live(onBlur: true)
-                            ->afterStateUpdated(function (Get $get, Set $set) {
-                                if ($get('tipo') == 1) {
-                                    $set('lucratividade', (((((float)$get('valor_venda') - (float)$get('valor_compra')) / (float)$get('valor_compra')) * 100)));
-                                }
+                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                self::calcularLucratividade($get, $set);
                             }),
+                        
                         FileUpload::make('foto')
                             ->label('Fotos')
                             ->directory('fotos-produtos')
                             ->visibility('public')
-                          //  ->columnSpanFull()
-                           // ->panelLayout('grid')
                             ->downloadable()
-                           // ->multiple()
                             ->maxSize(1000)
                             ->maxFiles(1)
-                            ->hidden(function (Get $get) {
-                                if ($get('tipo') == 1) {
-                                    return false;
-                                } elseif ($get('tipo') == 2) {
-                                    return true;
-                                }
-                            }),
+                            ->hidden(fn (Get $get) => $get('tipo') == 2),
+                        
                         Forms\Components\Select::make('categoria_id')
                             ->label('Categoria')
                             ->relationship('categoria', 'nome')
@@ -149,12 +131,48 @@ class ProdutoResource extends Resource
                                 Forms\Components\TextInput::make('nome')
                                     ->label('Nome')
                                     ->required()
-                                    
-
                             ])
 
                     ])->columns(2),
             ]);
+    }
+
+    /**
+     * Calcula o valor de venda com base no valor de compra e lucratividade
+     */
+    private static function calcularValorVenda(Get $get, Set $set): void
+    {
+        $valorCompra = (float) ($get('valor_compra') ?? 0);
+        $lucratividade = (float) ($get('lucratividade') ?? 0);
+        
+        if ($valorCompra > 0) {
+            $valorVenda = $valorCompra + ($valorCompra * $lucratividade / 100);
+            $set('valor_venda', number_format($valorVenda, 2, '.', ''));
+        } else {
+            // Se não há valor de compra, valor de venda é igual à lucratividade (para serviços)
+            if ($get('tipo') == 2) {
+                $set('valor_venda', $lucratividade);
+            }
+        }
+    }
+
+    /**
+     * Calcula a lucratividade com base no valor de compra e valor de venda
+     */
+    private static function calcularLucratividade(Get $get, Set $set): void
+    {
+        // Para serviços, não calcula lucratividade baseada em valor de compra
+        if ($get('tipo') == 2) {
+            return;
+        }
+        
+        $valorCompra = (float) ($get('valor_compra') ?? 0);
+        $valorVenda = (float) ($get('valor_venda') ?? 0);
+        
+        if ($valorCompra > 0 && $valorVenda > 0) {
+            $lucratividade = (($valorVenda - $valorCompra) / $valorCompra) * 100;
+            $set('lucratividade', number_format($lucratividade, 2, '.', ''));
+        }
     }
 
     public static function table(Table $table): Table
@@ -164,6 +182,7 @@ class ProdutoResource extends Resource
                 Tables\Columns\TextColumn::make('nome')
                     ->sortable()
                     ->searchable(),
+                
                 Tables\Columns\TextColumn::make('tipo')
                     ->sortable()
                     ->badge()
@@ -172,37 +191,46 @@ class ProdutoResource extends Resource
                         '2' => 'warning',
                     })
                     ->formatStateUsing(function ($state) {
-                        if ($state == 1) {
-                            return 'Produto';
-                        }
-                        if ($state == 2) {
-                            return 'Serviço';
-                        }
+                        return $state == 1 ? 'Produto' : 'Serviço';
                     })
                     ->searchable(),
+                
                 Tables\Columns\TextColumn::make('codbar')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                
                 Tables\Columns\TextColumn::make('categoria.nome')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
+                
                 Tables\Columns\TextColumn::make('estoque')
                     ->alignCenter()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
+                
                 Tables\Columns\TextColumn::make('valor_compra')
-                    ->money('BRL'),
+                    ->money('BRL')
+                    ->toggleable(),
+                
                 Tables\Columns\TextColumn::make('lucratividade')
-                    ->label('Lucratividade (%)'),
+                    ->label('Lucratividade (%)')
+                    ->formatStateUsing(fn($state) => number_format($state, 2) . '%')
+                    ->toggleable(),
+                
                 Tables\Columns\TextColumn::make('valor_venda')
-                    ->money('BRL'),
+                    ->money('BRL')
+                    ->sortable(),
+                
                 ImageColumn::make('foto')
-                    ->label('Fotos')
+                    ->label('Foto')
                     ->alignCenter()
                     ->circular()
-                    ->stacked()
-                    ->limit(2)
-                    ->limitedRemainingText(),
+                    ->toggleable(isToggledHiddenByDefault: true),
+                
                 Tables\Columns\TextColumn::make('created_at')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->dateTime(),
+                
                 Tables\Columns\TextColumn::make('updated_at')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->dateTime(),
@@ -212,6 +240,14 @@ class ProdutoResource extends Resource
                     ->label('Categoria')
                     ->relationship('categoria', 'nome')
                     ->multiple()
+                    ->preload(),
+                
+                Tables\Filters\SelectFilter::make('tipo')
+                    ->options([
+                        '1' => 'Produto',
+                        '2' => 'Serviço',
+                    ])
+                    ->label('Tipo'),
             ])
             ->headerActions([
                 Tables\Actions\Action::make('catalogo')
@@ -226,24 +262,20 @@ class ProdutoResource extends Resource
                 Tables\Actions\DeleteAction::make()
                     ->before(function (\Filament\Tables\Actions\DeleteAction $action, Produto $record) {
                         if ($record->itensVenda()->exists() || $record->pdv()->exists()) {
-                            
                             Notification::make()
                                 ->title('Ação cancelada')
                                 ->body('Este produto não pode ser excluído porque está vinculado a uma ou mais vendas.')
                                 ->danger()
                                 ->send();
-                        $action->cancel();
-                          
+                            $action->cancel();
                         }
                     }),
             ])
             ->bulkActions([
-              //  Tables\Actions\DeleteBulkAction::make(),
                 ExportBulkAction::make(),
-
-
-
-            ]);
+            ])
+            ->defaultSort('nome', 'asc')
+            ->deferLoading(); // Melhora performance em listagens grandes
     }
 
     public static function getRelations(): array
@@ -259,7 +291,6 @@ class ProdutoResource extends Resource
             'index' => Pages\ListProdutos::route('/'),
             'create' => Pages\CreateProduto::route('/create'),
             'edit' => Pages\EditProduto::route('/{record}/edit'),
-
         ];
     }
 }
