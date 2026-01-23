@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Livewire\ComprasMesChart;
 use App\Livewire\PagarHojeStatsOverview;
 use App\Livewire\ReceberHojeStatsOverview;
+use App\Livewire\TotalCompraStatsOverview;
 use App\Livewire\VendasMesChart;
 use App\Livewire\VendasPDVMesChart;
 use App\Livewire\TotalVendasPorCliente;
@@ -50,13 +51,18 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,
-                //  Widgets\FilamentInfoWidget::class,
                 PagarHojeStatsOverview::class,
                 ReceberHojeStatsOverview::class,
-                //  VendasMesChart::class,
-                VendasPDVMesChart::class,
-                // ComprasMesChart::class,
-                TotalVendasPorCliente::class,
+              //  VendasPDVMesChart::class,
+              //  TotalCompraStatsOverview::class,
+                //  Widgets\FilamentInfoWidget::class,
+            //     TotalCompraStatsOverview::class,
+            //     PagarHojeStatsOverview::class,
+            //     ReceberHojeStatsOverview::class,
+            //     //  VendasMesChart::class,
+            //     VendasPDVMesChart::class,
+            //   //  ComprasMesChart::class,
+            //     TotalVendasPorCliente::class,
 
                 // RanckingProdutos::class,
 

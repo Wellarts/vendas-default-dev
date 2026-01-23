@@ -74,7 +74,7 @@ class ContasReceberResource extends Resource
                             ->maxLength(10),
                         Forms\Components\TextInput::make('valor_parcela')
                             ->numeric()
-                            ->prefix('R$')                            
+                            ->prefix('R$')
                             ->label('Valor da Parcela')
                             ->readOnly(function ($context) {
                                 if ($context == 'create') {
@@ -146,7 +146,7 @@ class ContasReceberResource extends Resource
                         Forms\Components\DatePicker::make('data_pagamento')
                             ->label('Data do Recebimento')
                             ->hidden(function ($context, Get $get) {
-                                if ($context == 'edit' or $get('status') == 1){
+                                if ($context == 'edit' or $get('status') == 1) {
                                     return false;
                                 } else {
                                     return true;
@@ -157,7 +157,7 @@ class ContasReceberResource extends Resource
                             ->numeric()
                             ->prefix('R$')
                             ->hidden(function ($context, Get $get) {
-                                if ($context == 'edit' or $get('status') == 1){
+                                if ($context == 'edit' or $get('status') == 1) {
                                     return false;
                                 } else {
                                     return true;
@@ -265,8 +265,8 @@ class ContasReceberResource extends Resource
                     ->after(function ($livewire, $record) {
                         // Exclui o lançamento anterior no fluxo de caixa
                         \App\Models\FluxoCaixa::where('id_lancamento', $record->id)->delete();
-
-                        if ($record->status == 1 && $record->valor_parcela != $record->valor_recebido) {
+                        //  dd($record->status);
+                        if ($record->status == true && $record->valor_parcela != $record->valor_recebido) {
                             Notification::make()
                                 ->title('RECEBIMENTO PARCIAL')
                                 ->success()
@@ -279,9 +279,10 @@ class ContasReceberResource extends Resource
                                 ])
                                 ->persistent()
                                 ->send();
-                        }
+                        } elseif ($record->status == true && $record->valor_parcela == $record->valor_recebido) {
 
-                        // 1. Pegue a data da variável (formato esperado: 'YYYY-MM-DD')
+
+                            // 1. Pegue a data da variável (formato esperado: 'YYYY-MM-DD')
                             $data_apenas = date('Y-m-d', strtotime($record->data_pagamento));
 
                             // 2. Pegue a hora atual
@@ -290,16 +291,17 @@ class ContasReceberResource extends Resource
                             // 3. Combine a data e a hora (resulta em: 'YYYY-MM-DD H:i:s')
                             $created_at_combinado = $data_apenas . ' ' . $hora_apenas;
 
-                        $addFluxoCaixa = [
-                            'id_lancamento' => $record->id,
-                            'valor' => ($record->valor_recebido),
-                            'created_at' => $created_at_combinado,
-                            'updated_at' => $created_at_combinado,
-                            'tipo'  => 'CREDITO',
-                            'obs'   => 'Recebido ' . $record->obs . '',
-                        ];
+                            $addFluxoCaixa = [
+                                'id_lancamento' => $record->id,
+                                'valor' => ($record->valor_recebido),
+                                'created_at' => $created_at_combinado,
+                                'updated_at' => $created_at_combinado,
+                                'tipo'  => 'CREDITO',
+                                'obs'   => 'Recebido ' . $record->obs . '',
+                            ];
 
-                        FluxoCaixa::create($addFluxoCaixa);
+                            FluxoCaixa::create($addFluxoCaixa);
+                        }
                     }),
                 Tables\Actions\DeleteAction::make()
                     ->after(function ($record) {

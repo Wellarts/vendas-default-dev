@@ -11,6 +11,8 @@ class TotalCompraStatsOverview extends BaseWidget
 {
     public $record;
 
+    protected static ?int $sort = 3;
+
     protected function getStats(): array
     {
         $mes = date('m');

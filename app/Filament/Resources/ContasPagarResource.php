@@ -283,9 +283,8 @@ class ContasPagarResource extends Resource
                                 ])
                                 ->persistent()
                                 ->send();
-                        }
-
-                        // 1. Pegue a data da variável (formato esperado: 'YYYY-MM-DD')
+                        } elseif ($record->status = 1 and $record->valor_parcela == $record->valor_pago) {
+                            // 1. Pegue a data da variável (formato esperado: 'YYYY-MM-DD')
                             $data_apenas = date('Y-m-d', strtotime($record->data_pagamento));
 
                             // 2. Pegue a hora atual
@@ -294,16 +293,17 @@ class ContasPagarResource extends Resource
                             // 3. Combine a data e a hora (resulta em: 'YYYY-MM-DD H:i:s')
                             $created_at_combinado = $data_apenas . ' ' . $hora_apenas;
 
-                        $addFluxoCaixa = [
-                            'id_lancamento' => $record->id,
-                            'valor' => ($record->valor_pago * -1),
-                            'tipo'  => 'DEBITO',
-                            'created_at' => $created_at_combinado,
-                            'updated_at' => $created_at_combinado,
-                            'obs'   => 'Pagamento ' . $record->obs . '',
-                        ];
+                            $addFluxoCaixa = [
+                                'id_lancamento' => $record->id,
+                                'valor' => ($record->valor_pago * -1),
+                                'tipo'  => 'DEBITO',
+                                'created_at' => $created_at_combinado,
+                                'updated_at' => $created_at_combinado,
+                                'obs'   => 'Pagamento ' . $record->obs . '',
+                            ];
 
-                        FluxoCaixa::create($addFluxoCaixa);
+                            FluxoCaixa::create($addFluxoCaixa);
+                        }
                     }),
                 Tables\Actions\DeleteAction::make()
                     ->after(function ($record) {
