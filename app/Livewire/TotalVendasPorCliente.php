@@ -2,50 +2,79 @@
 
 namespace App\Livewire;
 
+use App\Models\VwTotalVendasPorCliente;
 use Filament\Widgets\ChartWidget;
 
 class TotalVendasPorCliente extends ChartWidget
 {
-    protected static ?string $heading = 'Clientes 10+';
+    protected static ?string $heading = 'Top 10 Clientes (Faturamento)';
 
-    protected int | string | array $columnSpan = 'full';
+    protected static ?int $sort = 5;
+
+    // Define uma largura maior para acomodar nomes de clientes longos
+   // protected int | string | array $columnSpan = 'full';
+
+    // Altura do gráfico para não ficar muito "achatado" em telas grandes
+    protected static ?string $maxHeight = '300px';
 
     protected function getData(): array
     {
+        // Realizamos apenas uma query para obter nomes e valores simultaneamente
+        $vendasPorCliente = VwTotalVendasPorCliente::query()
+            ->select('cliente_nome', 'valor_total_desconto')
+            ->orderByDesc('valor_total_desconto')
+            ->limit(10)
+            ->get();
+
         return [
             'datasets' => [
                 [
-                    'label' => 'Total Vendas por Cliente',
-                    'data'  => \App\Models\VwTotalVendasPorCliente::query()
-                        ->selectRaw('cliente_nome, valor_total_desconto as valor_total')
-                        ->limit(10)
-                        ->orderBy('valor_total', 'desc')
-                        ->get()
-                        ->pluck('valor_total')
-                        ->toArray(),
+                    'label' => 'Total Comprado (R$)',
+                    'data'  => $vendasPorCliente->pluck('valor_total_desconto')->toArray(),
+                    // Cores modernas com gradiente sólido do Tailwind/Filament
                     'backgroundColor' => [
-                        'rgba(255, 99, 132, 0.2)',
-                        'rgba(255, 159, 64, 0.2)',
-                        'rgba(255, 205, 86, 0.2)',
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(201, 203, 207, 0.2)',
+                        '#3b82f6', // blue-500
+                        '#10b981', // emerald-500
+                        '#f59e0b', // amber-500
+                        '#ef4444', // red-500
+                        '#8b5cf6', // violet-500
+                        '#ec4899', // pink-500
+                        '#06b6d4', // cyan-500
+                        '#f97316', // orange-500
+                        '#84cc16', // lime-500
+                        '#6366f1', // indigo-500
                     ],
-                    'borderColor' => 'rgb(68, 70, 70)',
+                    'borderRadius' => 4, // Bordas arredondadas nas barras
+                    'borderWidth' => 0,
                 ],
             ],
-            'labels' => \App\Models\VwTotalVendasPorCliente::query()
-                ->selectRaw('cliente_nome')
-                ->limit(10)
-                ->get()
-                ->pluck('cliente_nome')
-                ->toArray(),
+            'labels' => $vendasPorCliente->pluck('cliente_nome')->toArray(),
         ];
     }
 
     protected function getType(): string
     {
         return 'bar';
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'indexAxis' => 'y', // Inverte para barras horizontais (melhor para ler nomes)
+            'plugins' => [
+                'legend' => [
+                    'display' => false, // Remove a legenda repetitiva
+                ],
+            ],
+            'scales' => [
+                'x' => [
+                    'display' => true,
+                    'grid' => ['display' => false],
+                ],
+                'y' => [
+                    'grid' => ['display' => false],
+                ],
+            ],
+        ];
     }
 }

@@ -5,10 +5,12 @@ namespace App\Providers\Filament;
 use App\Livewire\ComprasMesChart;
 use App\Livewire\PagarHojeStatsOverview;
 use App\Livewire\ReceberHojeStatsOverview;
+use App\Livewire\VendasStatsOverview;
 use App\Livewire\TotalCompraStatsOverview;
 use App\Livewire\VendasMesChart;
 use App\Livewire\VendasPDVMesChart;
 use App\Livewire\TotalVendasPorCliente;
+use App\Livewire\TotalVendaStatsOverview;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -26,6 +28,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -53,8 +56,10 @@ class AdminPanelProvider extends PanelProvider
                 Widgets\AccountWidget::class,
                 PagarHojeStatsOverview::class,
                 ReceberHojeStatsOverview::class,
-              //  VendasPDVMesChart::class,
-              //  TotalCompraStatsOverview::class,
+                VendasPDVMesChart::class,
+                TotalVendasPorCliente::class,
+                TotalVendaStatsOverview::class,
+                TotalCompraStatsOverview::class,
                 //  Widgets\FilamentInfoWidget::class,
             //     TotalCompraStatsOverview::class,
             //     PagarHojeStatsOverview::class,
