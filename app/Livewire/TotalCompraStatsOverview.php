@@ -74,17 +74,17 @@ class TotalCompraStatsOverview extends BaseWidget
 
         return [
             Stat::make('Compras Hoje', $formatar($totalHoje))
-                ->description('Saídas do dia')
+                ->description('Hoje')
                 ->descriptionIcon('heroicon-m-calendar')
                 ->chart($this->getTrendSeteDias())
                 ->color('danger'),
 
             Stat::make('Compras no Mês', $formatar($totalMes))
-                ->description('Total mensal de entradas')
+                ->description('Mês atual')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color('warning'),
             Stat::make('Total de Compras', $formatar(DB::table('compras')->sum('valor_total') ?? 0))
-                ->description('Acumulado no sistema')
+                ->description('Todo período')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('primary')
         ];
