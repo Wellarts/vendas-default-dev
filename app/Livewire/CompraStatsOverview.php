@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Models\Compra;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class ComprasMesChart extends BaseWidget
@@ -18,29 +17,16 @@ class ComprasMesChart extends BaseWidget
         $anoAtual = $now->year;
         $mesAtual = $now->month;
         $hoje = $now->toDateString();
-        
-        // Chaves de cache para melhor performance
-        $cacheKeys = [
-            'total_geral' => "compras_total_geral",
-            'total_mes' => "compras_total_mes_{$anoAtual}_{$mesAtual}",
-            'total_hoje' => "compras_total_hoje_{$hoje}",
-        ];
 
-        // Busca dados com cache usando data_compra
-        $totalGeral = Cache::remember($cacheKeys['total_geral'], now()->addHours(1), function () {
-            return Compra::sum('valor_total') ?? 0;
-        });
+        // Busca dados diretamente do banco
+        $totalGeral = Compra::sum('valor_total') ?? 0;
 
-        $totalMes = Cache::remember($cacheKeys['total_mes'], now()->addMinutes(15), function () use ($anoAtual, $mesAtual) {
-            return Compra::whereYear('data_compra', $anoAtual)
-                ->whereMonth('data_compra', $mesAtual)
-                ->sum('valor_total') ?? 0;
-        });
+        $totalMes = Compra::whereYear('data_compra', $anoAtual)
+            ->whereMonth('data_compra', $mesAtual)
+            ->sum('valor_total') ?? 0;
 
-        $totalHoje = Cache::remember($cacheKeys['total_hoje'], now()->addMinutes(5), function () use ($hoje) {
-            return Compra::whereDate('data_compra', $hoje)
-                ->sum('valor_total') ?? 0;
-        });
+        $totalHoje = Compra::whereDate('data_compra', $hoje)
+            ->sum('valor_total') ?? 0;
 
         // Formatador reutilizável
         $formatarValor = fn($valor) => 'R$ ' . number_format($valor, 2, ',', '.');
@@ -52,7 +38,7 @@ class ComprasMesChart extends BaseWidget
 
         return [
             Stat::make('Compras Hoje', $formatarValor($totalHoje))
-                ->description($now->translatedFormat('d/m/Y'))
+                ->description('Hoje')
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('success')
                 ->chart($dadosHoje)
@@ -62,7 +48,7 @@ class ComprasMesChart extends BaseWidget
                 ]),
 
             Stat::make('Compras do Mês', $formatarValor($totalMes))
-                ->description($now->translatedFormat('F'))
+                ->description('Este Mês')
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('warning')
                 ->chart($dadosMes)
@@ -88,27 +74,23 @@ class ComprasMesChart extends BaseWidget
      */
     private function gerarDadosHoje(): array
     {
-        $cacheKey = 'compras_dados_hoje_' . Carbon::now()->toDateString();
+        $dados = [];
+        $hoje = Carbon::now()->toDateString();
         
-        return Cache::remember($cacheKey, now()->addMinutes(5), function () {
-            $dados = [];
-            $hoje = Carbon::now()->toDateString();
+        // Últimas 12 horas
+        for ($i = 11; $i >= 0; $i--) {
+            $horaInicio = Carbon::now()->subHours($i + 1);
+            $horaFim = Carbon::now()->subHours($i);
             
-            // Últimas 12 horas
-            for ($i = 11; $i >= 0; $i--) {
-                $horaInicio = Carbon::now()->subHours($i + 1);
-                $horaFim = Carbon::now()->subHours($i);
-                
-                $valor = Compra::whereDate('data_compra', $hoje)
-                    ->whereTime('data_compra', '>=', $horaInicio->format('H:i:s'))
-                    ->whereTime('data_compra', '<=', $horaFim->format('H:i:s'))
-                    ->sum('valor_total') ?? 0;
-                
-                $dados[] = round($valor, 2);
-            }
+            $valor = Compra::whereDate('data_compra', $hoje)
+                ->whereTime('data_compra', '>=', $horaInicio->format('H:i:s'))
+                ->whereTime('data_compra', '<=', $horaFim->format('H:i:s'))
+                ->sum('valor_total') ?? 0;
             
-            return $dados;
-        });
+            $dados[] = round($valor, 2);
+        }
+        
+        return $dados;
     }
 
     /**
@@ -116,24 +98,19 @@ class ComprasMesChart extends BaseWidget
      */
     private function gerarDadosMesAtual(int $ano, int $mes): array
     {
-        $cacheKey = "compras_dados_mes_{$ano}_{$mes}";
+        $diasNoMes = Carbon::create($ano, $mes, 1)->daysInMonth;
+        $diasTranscorridos = min($diasNoMes, Carbon::now()->day);
+        $dados = [];
         
-        return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($ano, $mes) {
-            $diasNoMes = Carbon::create($ano, $mes, 1)->daysInMonth;
-            $diasTranscorridos = min($diasNoMes, Carbon::now()->day);
-            $dados = [];
+        for ($dia = 1; $dia <= $diasTranscorridos; $dia++) {
+            $data = Carbon::create($ano, $mes, $dia);
+            $valor = Compra::whereDate('data_compra', $data->toDateString())
+                ->sum('valor_total') ?? 0;
             
-            for ($dia = 1; $dia <= $diasTranscorridos; $dia++) {
-                $valor = Compra::whereYear('data_compra', $ano)
-                    ->whereMonth('data_compra', $mes)
-                    ->whereDay('data_compra', $dia)
-                    ->sum('valor_total') ?? 0;
-                
-                $dados[] = round($valor, 2);
-            }
-            
-            return $dados;
-        });
+            $dados[] = round($valor, 2);
+        }
+        
+        return $dados;
     }
 
     /**
@@ -141,26 +118,22 @@ class ComprasMesChart extends BaseWidget
      */
     private function gerarDadosGeral(): array
     {
-        $cacheKey = 'compras_dados_geral_12_meses';
+        $dados = [];
         
-        return Cache::remember($cacheKey, now()->addHours(1), function () {
-            $dados = [];
+        // Últimos 12 meses
+        for ($i = 11; $i >= 0; $i--) {
+            $data = Carbon::now()->subMonths($i);
+            $ano = $data->year;
+            $mes = $data->month;
             
-            // Últimos 12 meses
-            for ($i = 11; $i >= 0; $i--) {
-                $data = Carbon::now()->subMonths($i);
-                $ano = $data->year;
-                $mes = $data->month;
-                
-                $valor = Compra::whereYear('data_compra', $ano)
-                    ->whereMonth('data_compra', $mes)
-                    ->sum('valor_total') ?? 0;
-                
-                $dados[] = round($valor, 2);
-            }
+            $valor = Compra::whereYear('data_compra', $ano)
+                ->whereMonth('data_compra', $mes)
+                ->sum('valor_total') ?? 0;
             
-            return $dados;
-        });
+            $dados[] = round($valor, 2);
+        }
+        
+        return $dados;
     }
 
     /**
@@ -171,57 +144,12 @@ class ComprasMesChart extends BaseWidget
         $now = Carbon::now();
         $anoAtual = $now->year;
         $mesAtual = $now->month;
-        $cacheKey = "compras_media_diaria_{$anoAtual}_{$mesAtual}";
         
-        return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($anoAtual, $mesAtual, $now) {
-            $totalMes = Compra::whereYear('data_compra', $anoAtual)
-                ->whereMonth('data_compra', $mesAtual)
-                ->sum('valor_total') ?? 0;
-            
-            $diasTranscorridos = max(1, $now->day);
-            return $totalMes / $diasTranscorridos;
-        });
-    }
-
-    // Método para limpar cache quando necessário
-    public static function clearCache(): void
-    {
-        $now = Carbon::now();
-        $anoAtual = $now->year;
-        $mesAtual = $now->month;
-        $hoje = $now->toDateString();
+        $totalMes = Compra::whereYear('data_compra', $anoAtual)
+            ->whereMonth('data_compra', $mesAtual)
+            ->sum('valor_total') ?? 0;
         
-        // Limpa caches principais
-        Cache::forget("compras_total_geral");
-        Cache::forget("compras_total_mes_{$anoAtual}_{$mesAtual}");
-        Cache::forget("compras_total_hoje_{$hoje}");
-        
-        // Limpa caches de gráficos
-        Cache::forget("compras_dados_hoje_{$hoje}");
-        Cache::forget("compras_dados_mes_{$anoAtual}_{$mesAtual}");
-        Cache::forget("compras_dados_geral_12_meses");
-        Cache::forget("compras_media_diaria_{$anoAtual}_{$mesAtual}");
-    }
-
-    // Método para invalidar cache quando nova compra é registrada
-    public static function invalidateCacheOnNewCompra(): void
-    {
-        $now = Carbon::now();
-        $anoAtual = $now->year;
-        $mesAtual = $now->month;
-        $hoje = $now->toDateString();
-        
-        // Limpa caches do dia atual
-        Cache::forget("compras_total_hoje_{$hoje}");
-        Cache::forget("compras_dados_hoje_{$hoje}");
-        
-        // Limpa caches do mês atual
-        Cache::forget("compras_total_mes_{$anoAtual}_{$mesAtual}");
-        Cache::forget("compras_dados_mes_{$anoAtual}_{$mesAtual}");
-        Cache::forget("compras_media_diaria_{$anoAtual}_{$mesAtual}");
-        
-        // Limpa caches gerais
-        Cache::forget("compras_total_geral");
-        Cache::forget("compras_dados_geral_12_meses");
+        $diasTranscorridos = max(1, $now->day);
+        return $totalMes / $diasTranscorridos;
     }
 }

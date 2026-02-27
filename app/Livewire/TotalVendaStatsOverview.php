@@ -7,7 +7,6 @@ use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class TotalVendaStatsOverview extends BaseWidget
@@ -22,24 +21,18 @@ class TotalVendaStatsOverview extends BaseWidget
         $ano = Carbon::now()->year;
 
         // 1. Total Geral (Sem filtro de data)
-        $totalGeral = Cache::remember('vendas_total_geral', now()->addMinutes(30), function () {
-            return DB::table('venda_p_d_v_s')->sum('valor_total_desconto') ?? 0;
-        });
+        $totalGeral = DB::table('venda_p_d_v_s')->sum('valor_total_desconto') ?? 0;
 
         // 2. Vendas Hoje (Filtrado por data_venda)
-        $totalHoje = Cache::remember("vendas_hoje_{$hoje}", now()->addMinutes(5), function () use ($hoje) {
-            return DB::table('venda_p_d_v_s')
-                ->whereDate('data_venda', $hoje)
-                ->sum('valor_total_desconto') ?? 0;
-        });
+        $totalHoje = DB::table('venda_p_d_v_s')
+            ->whereDate('data_venda', $hoje)
+            ->sum('valor_total_desconto') ?? 0;
 
         // 3. Vendas no Mês (Filtrado por data_venda)
-        $totalMes = Cache::remember("vendas_mes_{$ano}_{$mes}", now()->addMinutes(10), function () use ($mes, $ano) {
-            return DB::table('venda_p_d_v_s')
-                ->whereMonth('data_venda', $mes)
-                ->whereYear('data_venda', $ano)
-                ->sum('valor_total_desconto') ?? 0;
-        });
+        $totalMes = DB::table('venda_p_d_v_s')
+            ->whereMonth('data_venda', $mes)
+            ->whereYear('data_venda', $ano)
+            ->sum('valor_total_desconto') ?? 0;
 
         $formatar = fn($valor) => 'R$ ' . number_format($valor, 2, ',', '.');
 
@@ -51,7 +44,7 @@ class TotalVendaStatsOverview extends BaseWidget
                 ->color('success'),
 
             Stat::make('Vendas este Mês', $formatar($totalMes))
-                ->description('Mês atual')
+                ->description('Este Mês')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color('info'),
 
@@ -70,15 +63,15 @@ class TotalVendaStatsOverview extends BaseWidget
      */
     private function getTrendUltimos7Dias(): array
     {
-        return Cache::remember('vendas_trend_7d_dash', now()->addMinutes(15), function () {
-            $dados = [];
-            for ($i = 6; $i >= 0; $i--) {
-                $data = Carbon::now()->subDays($i)->toDateString();
-                $dados[] = DB::table('vendas')
-                    ->whereDate('data_venda', $data)
-                    ->sum('valor_total_desconto') ?? 0;
-            }
-            return $dados;
-        });
+        $dados = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $data = Carbon::now()->subDays($i)->toDateString();
+            $valor = DB::table('venda_p_d_v_s') // Corrigido: usar a mesma tabela 'venda_p_d_v_s'
+                ->whereDate('data_venda', $data)
+                ->sum('valor_total_desconto') ?? 0;
+            
+            $dados[] = round($valor, 2);
+        }
+        return $dados;
     }
 }
