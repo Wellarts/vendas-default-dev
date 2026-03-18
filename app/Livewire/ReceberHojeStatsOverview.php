@@ -5,7 +5,6 @@ namespace App\Livewire;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class ReceberHojeStatsOverview extends BaseWidget
@@ -15,37 +14,23 @@ class ReceberHojeStatsOverview extends BaseWidget
     protected function getStats(): array
     {
         $now = Carbon::now();
-        $mes = $now->month;
-        $dia = $now->day;
-        $hoje = $now->toDateString();
+        $hoje = $now->toDateString(); // Formato YYYY-MM-DD
 
-        // Chaves de cache para melhor performance
-        $cacheKeys = [
-            'total_hoje' => "contas_receber_total_hoje_{$hoje}",
-            'total_mes' => "contas_receber_total_mes_{$now->year}_{$mes}",
-            'total_geral' => "contas_receber_total_geral",
-        ];
+        // Busca dados diretamente do banco
+        $totalHoje = DB::table('contas_recebers')
+            ->where('status', 0)
+            ->whereDate('data_vencimento', $hoje) // Corrigido: compara data completa
+            ->sum('valor_parcela') ?? 0;
 
-        // Busca dados com cache
-        $totalHoje = Cache::remember($cacheKeys['total_hoje'], now()->addMinutes(5), function () use ($dia) {
-            return DB::table('contas_recebers')
-                ->where('status', 0)
-                ->whereDay('data_vencimento', $dia)
-                ->sum('valor_parcela') ?? 0;
-        });
+        $totalMes = DB::table('contas_recebers')
+            ->where('status', 0)
+            ->whereYear('data_vencimento', $now->year)
+            ->whereMonth('data_vencimento', $now->month)
+            ->sum('valor_parcela') ?? 0;
 
-        $totalMes = Cache::remember($cacheKeys['total_mes'], now()->addMinutes(10), function () use ($mes) {
-            return DB::table('contas_recebers')
-                ->where('status', 0)
-                ->whereMonth('data_vencimento', $mes)
-                ->sum('valor_parcela') ?? 0;
-        });
-
-        $totalGeral = Cache::remember($cacheKeys['total_geral'], now()->addHour(), function () {
-            return DB::table('contas_recebers')
-                ->where('status', 0)
-                ->sum('valor_parcela') ?? 0;
-        });
+        $totalGeral = DB::table('contas_recebers')
+            ->where('status', 0)
+            ->sum('valor_parcela') ?? 0;
 
         // Formatador reutilizável
         $formatarValor = fn($valor) => 'R$ ' . number_format($valor, 2, ',', '.');
@@ -61,7 +46,7 @@ class ReceberHojeStatsOverview extends BaseWidget
                 ]),
 
             Stat::make('A Receber Este Mês', $formatarValor($totalMes))
-                ->description('Este mês')
+                ->description('Este Mês')
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('warning')
                 ->chart($this->gerarDadosMes())
@@ -70,7 +55,7 @@ class ReceberHojeStatsOverview extends BaseWidget
                 ]),
 
             Stat::make('Tudo a Receber', $formatarValor($totalGeral))
-                ->description('Todo Período')
+                ->description('Total geral')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('primary')
                 ->chart($this->gerarDadosGeral())
@@ -81,111 +66,68 @@ class ReceberHojeStatsOverview extends BaseWidget
     }
 
     /**
-     * Gera dados de hoje para gráfico (últimos 7 dias)
+     * Gera dados dos últimos 7 dias para o gráfico
      */
     private function gerarDadosHoje(): array
     {
-        $cacheKey = 'contas_receber_dados_hoje_7_dias';
+        $dados = [];
         
-        return Cache::remember($cacheKey, now()->addMinutes(5), function () {
-            $dados = [];
+        // Últimos 7 dias
+        for ($i = 6; $i >= 0; $i--) {
+            $data = Carbon::now()->subDays($i);
+            $valor = DB::table('contas_recebers')
+                ->where('status', 0)
+                ->whereDate('data_vencimento', $data->toDateString())
+                ->sum('valor_parcela') ?? 0;
             
-            // Últimos 7 dias incluindo hoje
-            for ($i = 6; $i >= 0; $i--) {
-                $data = Carbon::now()->subDays($i);
-                $valor = DB::table('contas_recebers')
-                    ->where('status', 0)
-                    ->whereDate('data_vencimento', $data->toDateString())
-                    ->sum('valor_parcela') ?? 0;
-                
-                $dados[] = round($valor, 2);
-            }
-            
-            return $dados;
-        });
+            $dados[] = round($valor, 2);
+        }
+        
+        return $dados;
     }
 
     /**
-     * Gera dados do mês para gráfico (dias do mês atual)
+     * Gera dados diários do mês atual para o gráfico
      */
     private function gerarDadosMes(): array
     {
         $now = Carbon::now();
-        $ano = $now->year;
-        $mes = $now->month;
-        $cacheKey = "contas_receber_dados_mes_{$ano}_{$mes}";
+        $diasNoMes = $now->daysInMonth;
+        $diasTranscorridos = min($diasNoMes, $now->day);
+        $dados = [];
         
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($ano, $mes) {
-            $diasNoMes = Carbon::create($ano, $mes, 1)->daysInMonth;
-            $diasTranscorridos = min($diasNoMes, Carbon::now()->day);
-            $dados = [];
+        for ($dia = 1; $dia <= $diasTranscorridos; $dia++) {
+            $data = Carbon::create($now->year, $now->month, $dia);
+            $valor = DB::table('contas_recebers')
+                ->where('status', 0)
+                ->whereDate('data_vencimento', $data->toDateString())
+                ->sum('valor_parcela') ?? 0;
             
-            for ($dia = 1; $dia <= $diasTranscorridos; $dia++) {
-                $valor = DB::table('contas_recebers')
-                    ->where('status', 0)
-                    ->whereYear('data_vencimento', $ano)
-                    ->whereMonth('data_vencimento', $mes)
-                    ->whereDay('data_vencimento', $dia)
-                    ->sum('valor_parcela') ?? 0;
-                
-                $dados[] = round($valor, 2);
-            }
-            
-            return $dados;
-        });
+            $dados[] = round($valor, 2);
+        }
+        
+        return $dados;
     }
 
     /**
-     * Gera dados gerais para gráfico (últimos 12 meses)
+     * Gera dados dos últimos 12 meses para o gráfico
      */
     private function gerarDadosGeral(): array
     {
-        $cacheKey = 'contas_receber_dados_geral_12_meses';
+        $dados = [];
         
-        return Cache::remember($cacheKey, now()->addHour(), function () {
-            $dados = [];
+        // Últimos 12 meses
+        for ($i = 11; $i >= 0; $i--) {
+            $data = Carbon::now()->subMonths($i);
+            $valor = DB::table('contas_recebers')
+                ->where('status', 0)
+                ->whereYear('data_vencimento', $data->year)
+                ->whereMonth('data_vencimento', $data->month)
+                ->sum('valor_parcela') ?? 0;
             
-            // Últimos 12 meses
-            for ($i = 11; $i >= 0; $i--) {
-                $data = Carbon::now()->subMonths($i);
-                $valor = DB::table('contas_recebers')
-                    ->where('status', 0)
-                    ->whereYear('data_vencimento', $data->year)
-                    ->whereMonth('data_vencimento', $data->month)
-                    ->sum('valor_parcela') ?? 0;
-                
-                $dados[] = round($valor, 2);
-            }
-            
-            return $dados;
-        });
-    }
-
-    // Método para limpar cache quando necessário
-    public static function clearCache(): void
-    {
-        $now = Carbon::now();
-        $hoje = $now->toDateString();
+            $dados[] = round($valor, 2);
+        }
         
-        Cache::forget("contas_receber_total_hoje_{$hoje}");
-        Cache::forget("contas_receber_total_mes_{$now->year}_{$now->month}");
-        Cache::forget("contas_receber_total_geral");
-        Cache::forget('contas_receber_dados_hoje_7_dias');
-        Cache::forget("contas_receber_dados_mes_{$now->year}_{$now->month}");
-        Cache::forget('contas_receber_dados_geral_12_meses');
-    }
-
-    // Método para invalidar cache quando nova conta é criada ou atualizada
-    public static function invalidateCacheOnChange(): void
-    {
-        $now = Carbon::now();
-        $hoje = $now->toDateString();
-        
-        // Limpa cache do dia e mês atual
-        Cache::forget("contas_receber_total_hoje_{$hoje}");
-        Cache::forget("contas_receber_total_mes_{$now->year}_{$now->month}");
-        
-        // Limpa cache geral
-        Cache::forget("contas_receber_total_geral");
+        return $dados;
     }
 }
