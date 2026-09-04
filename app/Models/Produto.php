@@ -16,7 +16,6 @@ class Produto extends Model
     protected $fillable = [
         'nome',
         'codbar',
-        'categoria_id',
         'estoque',
         'valor_compra',
         'lucratividade',
@@ -65,11 +64,6 @@ class Produto extends Model
     public function itensVenda()
     {
         return $this->hasMany(ItensVenda::class);
-    }
-
-    public function categoria()
-    {
-        return $this->belongsTo(Categoria::class);
     }
 
     public function getActivitylogOptions(): LogOptions

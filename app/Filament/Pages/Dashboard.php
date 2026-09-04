@@ -16,8 +16,6 @@ use Filament\Notifications\Notification;
 use App\Models\ContasPagar;
 use App\Models\ContasReceber;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Mockery\Matcher\Not;
 
 class Dashboard extends \Filament\Pages\Dashboard
 {
@@ -38,101 +36,89 @@ class Dashboard extends \Filament\Pages\Dashboard
     public function mount(): void
     {
 
-        if(db::table('parametros')->count() == 0){
-            //cria um registro padrão na tabela parametros se não existir nenhum
-            DB::table('parametros')->insert([
-                'nome_empresa' => 'Minha Empresa',
-                'endereco_completo' => '',
-                'telefone' => '',
-                'email' => '',
-                'cnpj' => '',
-                'redes_sociais' => '',
-                'logo' => '',
-                'versao_sistema' => '1.0.0',
-                'data_atualizacao' => now(),
-                'detalhe_atualizacao' => '',
-                'ativo' => true,
-                'notificar_usuario' => '',
-                'catalogo' => false,
-                'ativar_notificacoes' => false,
-            ]);
-        }
+        // Notification::make()
+        //     ->title('ATENÇÃO')
+        //     ->persistent()
+        //     ->danger()
+        //     ->body('Sua mensalidade está atrasada, regularize sua assinatura para evitar o bloqueio do sistema.
+        //     PIX: 28708223831')
+        //     ->actions([
+        //         Action::make('Entendi')
+        //             ->button()
+        //             ->close(),
+        //     ])
+        //     ->send();
 
-        if(db::table('parametros')->where('ativar_notificacao_usuario', '=', 1)->exists()) {
-            Notification::make()
-                ->title('Informação do Administrador')
-                ->body(db::table('parametros')->value('notificar_usuario'))
-                ->persistent()
-                ->danger()
-                ->send();
-        }
 
-        if (db::table('parametros')->where('ativar_notificacoes', '=', 1)->exists()) {
+        // Otimização: buscar IDs em lote e deletar apenas se necessário
+        // $vendaPDVIds = VendaPDV::pluck('id');
+        // if ($vendaPDVIds->isNotEmpty()) {
+        //     PDV::whereNotIn('venda_p_d_v_id', $vendaPDVIds)->delete();
+        // }
 
-            //***********NOTIFICAÇÃO DE CONTAS A RECEBER*************
+        //***********NOTIFICAÇÃO DE CONTAS A RECEBER*************
 
-            // Otimização: eager loading e cálculo de data fora do loop
-            $contasReceberVencer = ContasReceber::where('status', '=', '0')->with('cliente')->get();
-            $hoje = Carbon::today();
-            foreach ($contasReceberVencer as $cr) {
-                $dataVencimento = Carbon::parse($cr->data_vencimento);
-                $qtd_dias = $hoje->diffInDays($dataVencimento, false);
-                $clienteNome = $cr->cliente->nome ?? 'Desconhecido';
-                $valorParcela = number_format($cr->valor_parcela, 2, ',', '.');
-                $dataFormatada = $dataVencimento->format('d/m/Y');
-                if ($qtd_dias <= 3 && $qtd_dias > 0) {
-                    Notification::make()
-                        ->title('ATENÇÃO: Conta a receber com vencimento próximo.')
-                        ->body("Do cliente <b>{$clienteNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
-                        ->success()
-                        ->send();
-                } elseif ($qtd_dias == 0) {
-                    Notification::make()
-                        ->title('ATENÇÃO: Conta a receber com vencimento para hoje.')
-                        ->body("Do cliente <b>{$clienteNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
-                        ->warning()
-
-                        ->send();
-                } elseif ($qtd_dias < 0) {
-                    Notification::make()
-                        ->title('ATENÇÃO: Conta a receber vencida.')
-                        ->body("Do cliente <b>{$clienteNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
-                        ->danger()
-                        ->send();
-                }
+        // Otimização: eager loading e cálculo de data fora do loop
+        $contasReceberVencer = ContasReceber::where('status', '=', '0')->with('cliente')->get();
+        $hoje = Carbon::today();
+        foreach ($contasReceberVencer as $cr) {
+            $dataVencimento = Carbon::parse($cr->data_vencimento);
+            $qtd_dias = $hoje->diffInDays($dataVencimento, false);
+            $clienteNome = $cr->cliente->nome ?? 'Desconhecido';
+            $valorParcela = number_format($cr->valor_parcela, 2, ',', '.');
+            $dataFormatada = $dataVencimento->format('d/m/Y');
+            if ($qtd_dias <= 3 && $qtd_dias > 0) {
+                Notification::make()
+                    ->title('ATENÇÃO: Conta a receber com vencimento próximo.')
+                    ->body("Do cliente <b>{$clienteNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
+                    ->success()    
+                    ->send();
+            } elseif ($qtd_dias == 0) {
+                Notification::make()
+                    ->title('ATENÇÃO: Conta a receber com vencimento para hoje.')
+                    ->body("Do cliente <b>{$clienteNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
+                    ->warning()
+    
+                    ->send();
+            } elseif ($qtd_dias < 0) {
+                Notification::make()
+                    ->title('ATENÇÃO: Conta a receber vencida.')
+                    ->body("Do cliente <b>{$clienteNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
+                    ->danger()    
+                    ->send();
             }
+        }
 
-            //***********NOTIFICAÇÃO DE CONTAS A PAGAR*************
-            $contasPagarVencer = ContasPagar::where('status', '=', '0')->with('fornecedor')->get();
-            $hoje = Carbon::today();
-            foreach ($contasPagarVencer as $cp) {
-                $dataVencimento = Carbon::parse($cp->data_vencimento);
-                $qtd_dias = $hoje->diffInDays($dataVencimento, false);
-                $fornecedorNome = $cp->fornecedor->nome ?? 'Desconhecido';
-                $valorParcela = number_format($cp->valor_parcela, 2, ',', '.');
-                $dataFormatada = $dataVencimento->format('d/m/Y');
-                if ($qtd_dias <= 3 && $qtd_dias > 0) {
-                    Notification::make()
-                        ->title('ATENÇÃO: Conta a pagar com vencimento próximo.')
-                        ->body("Do fornecedor <b>{$fornecedorNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
-                        ->success()
-                        // ->persistent()
-                        ->send();
-                } elseif ($qtd_dias == 0) {
-                    Notification::make()
-                        ->title('ATENÇÃO: Conta a pagar com vencimento para hoje.')
-                        ->body("Do fornecedor <b>{$fornecedorNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
-                        ->warning()
-                        //->persistent()
-                        ->send();
-                } elseif ($qtd_dias < 0) {
-                    Notification::make()
-                        ->title('ATENÇÃO: Conta a pagar vencida.')
-                        ->body("Do fornecedor <b>{$fornecedorNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
-                        ->danger()
-
-                        ->send();
-                }
+        //***********NOTIFICAÇÃO DE CONTAS A PAGAR*************
+        $contasPagarVencer = ContasPagar::where('status', '=', '0')->with('fornecedor')->get();
+        $hoje = Carbon::today();
+        foreach ($contasPagarVencer as $cp) {
+            $dataVencimento = Carbon::parse($cp->data_vencimento);
+            $qtd_dias = $hoje->diffInDays($dataVencimento, false);
+            $fornecedorNome = $cp->fornecedor->nome ?? 'Desconhecido';
+            $valorParcela = number_format($cp->valor_parcela, 2, ',', '.');
+            $dataFormatada = $dataVencimento->format('d/m/Y');
+            if ($qtd_dias <= 3 && $qtd_dias > 0) {
+                Notification::make()
+                    ->title('ATENÇÃO: Conta a pagar com vencimento próximo.')
+                    ->body("Do fornecedor <b>{$fornecedorNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
+                    ->success()
+                   // ->persistent()
+                    ->send();
+            } elseif ($qtd_dias == 0) {
+                Notification::make()
+                    ->title('ATENÇÃO: Conta a pagar com vencimento para hoje.')
+                    ->body("Do fornecedor <b>{$fornecedorNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
+                    ->warning()
+                    //->persistent()
+                    ->send();
+            } elseif ($qtd_dias < 0) {
+                Notification::make()
+                    ->title('ATENÇÃO: Conta a pagar vencida.')
+                    ->body("Do fornecedor <b>{$fornecedorNome}</b> no valor de R$ <b>{$valorParcela}</b> com vencimento em <b>{$dataFormatada}</b>.")
+                    ->danger()
+    
+                    ->send();
             }
         }
     }
