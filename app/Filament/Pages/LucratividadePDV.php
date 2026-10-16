@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\VendaPDV;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\Summarizers\Sum;
+use Filament\Tables\Columns\Summarizers\Summarizer;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -12,6 +13,8 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Forms\Components\DatePicker;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 class LucratividadePDV extends Page implements HasTable
 {
@@ -29,38 +32,27 @@ class LucratividadePDV extends Page implements HasTable
 
     protected static ?int $navigationSort = 18;
 
-    // public static function shouldRegisterNavigation(): bool
-    // {
-    //      /** @var \App\Models\User */
-    //      $authUser =  auth()->user();
-
-    //      if ($authUser->hasRole('TI')) {
-    //          return true;
-    //      } else {
-    //          return false;
-    //      }
-    // }
-
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasRole(['Administrador','TI']);
+        return auth()->user()?->hasRole(['Administrador', 'TI']);
     }
-
-
-    // Removido processamento desnecessário de lucro no mount()
 
     public function table(Table $table): Table
     {
         // Otimiza a query para já trazer o sum do custo dos itens
         return $table
+            // Página abre rápido; a tabela só carrega depois via Livewire
+            ->deferLoading()
+            // Sem a opção "todos", que derruba o servidor
+            ->paginated([10, 25, 50])
+            ->defaultPaginationPageOption(25)
+            ->persistFiltersInSession()
             ->defaultSort('data_venda', 'desc')
             ->query(
                 VendaPDV::query()
                     ->where('tipo_registro', 'venda')
-                    ->with(['cliente:id,nome', 'funcionario:id,nome', 'formaPgmto:id,nome'])
                     ->withSum('itensVenda as total_custo_produtos', 'total_custo_atual')
             )
-            // ->defaultGroup('data_venda','year')
             ->columns([
                 TextColumn::make('id')
                     ->alignCenter()
@@ -101,22 +93,16 @@ class LucratividadePDV extends Page implements HasTable
                     ->money('BRL')
                     ->color('warning'),
                 TextColumn::make('lucro_venda')
-                    ->summarize(new class extends \Filament\Tables\Columns\Summarizers\Summarizer {
-                        public function summarize(\Illuminate\Database\Query\Builder $query, string $attribute): mixed {
-                            // Antes: $query->get() trazia TODAS as linhas filtradas (sem paginação)
-                            // para o PHP a cada render da tabela, somando em memória.
-                            // Isso escala mal (todo o histórico de vendas) e é a causa
-                            // mais provável do 504: a query de origem já tem um subselect
-                            // (withSum) por linha, então "get() sem limite" multiplica o custo.
-                            // Agora a soma é feita no próprio banco, sem trafegar linhas.
-                            $total = \Illuminate\Support\Facades\DB::query()
-                                ->fromSub((clone $query)->reorder(), 'sub')
-                                ->selectRaw('SUM(sub.valor_total_desconto - COALESCE(sub.total_custo_produtos, 0)) as total')
-                                ->value('total');
-
-                            return 'R$ ' . number_format($total ?? 0, 2, ',', '.');
-                        }
-                    })
+                    ->summarize(
+                        Summarizer::make()
+                            ->label('Total')
+                            ->money('BRL')
+                            // Soma feita no banco, sem carregar todos os registros no PHP
+                            ->using(fn (QueryBuilder $query) => DB::query()
+                                ->fromSub($query->clone()->reorder(), 'v')
+                                ->selectRaw('SUM(COALESCE(valor_total_desconto, 0) - COALESCE(total_custo_produtos, 0)) as lucro')
+                                ->value('lucro'))
+                    )
                     ->badge()
                     ->alignCenter()
                     ->label('Lucro por Venda')
@@ -126,43 +112,45 @@ class LucratividadePDV extends Page implements HasTable
                         // Usa o valor já carregado do withSum
                         return ($record->valor_total_desconto - ($record->total_custo_produtos ?? 0));
                     }),
-
-
             ])
             ->filters([
                 // Filtro por cliente
                 SelectFilter::make('cliente')
-                    ->relationship('cliente', 'nome', fn ($query) => $query->select('id', 'nome'))
+                    ->relationship('cliente', 'nome')
                     ->searchable()
                     ->label('Cliente'),
 
                 // Filtro por funcionário
                 SelectFilter::make('funcionario')
-                    ->relationship('funcionario', 'nome', fn ($query) => $query->select('id', 'nome'))
+                    ->relationship('funcionario', 'nome')
                     ->searchable()
                     ->label('Funcionário'),
+
                 // Filtro por forma de pagamento
                 SelectFilter::make('forma_pgmto_id')
-                    ->relationship('formaPgmto', 'nome', fn ($query) => $query->select('id', 'nome'))
+                    ->relationship('formaPgmto', 'nome')
                     ->label('Forma de Pagamento'),
 
-                // Filtro por data
+                // Filtro por data (padrão: mês atual, para não somar o histórico inteiro ao abrir)
                 Filter::make('data_venda')
                     ->form([
                         DatePicker::make('venda_de')
-                            ->label('Data da Venda de:'),
+                            ->label('Data da Venda de:')
+                            ->default(now()->startOfMonth()),
                         DatePicker::make('venda_ate')
-                            ->label('Data da Venda até:'),
+                            ->label('Data da Venda até:')
+                            ->default(now()),
                     ])
                     ->query(function ($query, array $data) {
+                        // Sem whereDate(): comparar direto a coluna permite usar índice
                         $query
                             ->when(
                                 $data['venda_de'],
-                                fn ($query) => $query->whereDate('data_venda', '>=', $data['venda_de'])
+                                fn ($query) => $query->where('data_venda', '>=', $data['venda_de'])
                             )
                             ->when(
                                 $data['venda_ate'],
-                                fn ($query) => $query->whereDate('data_venda', '<=', $data['venda_ate'])
+                                fn ($query) => $query->where('data_venda', '<=', $data['venda_ate'] . ' 23:59:59')
                             );
                     }),
             ]);
@@ -173,53 +161,88 @@ class LucratividadePDV extends Page implements HasTable
         return [
             \Filament\Actions\Action::make('exportar_pdf')
                 ->label('Relatório de Vendas - PDF')
-                 ->icon('heroicon-o-arrow-down-tray')
+                ->icon('heroicon-o-arrow-down-tray')
                 ->color('success')
                 ->form([
+                    // Closures: as consultas só rodam ao abrir o modal, não a cada render da página
                     \Filament\Forms\Components\Select::make('cliente_id')
                         ->label('Cliente')
+                        ->options(fn () => \App\Models\Cliente::orderBy('nome')->pluck('nome', 'id')->toArray())
                         ->searchable()
-                        ->getSearchResultsUsing(fn (string $search) => \App\Models\Cliente::query()
-                            ->where('nome', 'like', "%{$search}%")
-                            ->orderBy('nome')
-                            ->limit(50)
-                            ->pluck('nome', 'id'))
-                        ->getOptionLabelUsing(fn ($value) => \App\Models\Cliente::find($value)?->nome)
                         ->placeholder('Todos'),
                     \Filament\Forms\Components\Select::make('funcionario_id')
                         ->label('Funcionário')
+                        ->options(fn () => \App\Models\Funcionario::orderBy('nome')->pluck('nome', 'id')->toArray())
                         ->searchable()
-                        ->getSearchResultsUsing(fn (string $search) => \App\Models\Funcionario::query()
-                            ->where('nome', 'like', "%{$search}%")
-                            ->orderBy('nome')
-                            ->limit(50)
-                            ->pluck('nome', 'id'))
-                        ->getOptionLabelUsing(fn ($value) => \App\Models\Funcionario::find($value)?->nome)
                         ->placeholder('Todos'),
                     \Filament\Forms\Components\Select::make('forma_pgmto_id')
                         ->label('Forma de Pagamento')
-                        ->options(\App\Models\FormaPgmto::orderBy('nome')->pluck('nome', 'id')->toArray())
+                        ->options(fn () => \App\Models\FormaPgmto::orderBy('nome')->pluck('nome', 'id')->toArray())
                         ->searchable()
                         ->placeholder('Todas'),
                     \Filament\Forms\Components\DatePicker::make('data_de')
                         ->label('Data de'),
                     \Filament\Forms\Components\DatePicker::make('data_ate')
                         ->label('Data até'),
+                    \Filament\Forms\Components\Toggle::make('detalhado')
+                        ->label('Incluir produtos de cada venda')
+                        ->helperText('Deixe desligado para períodos longos: o relatório fica bem mais leve.')
+                        ->default(false),
                 ])
                 ->requiresConfirmation()
-                ->action(function(array $data, $livewire) {
+                ->action(function (array $data, $livewire) {
                     $params = [];
-                    if(!empty($data['cliente_id'])) $params['cliente_id'] = $data['cliente_id'];
-                    if(!empty($data['funcionario_id'])) $params['funcionario_id'] = $data['funcionario_id'];
-                    if(!empty($data['forma_pgmto_id'])) $params['forma_pgmto_id'] = $data['forma_pgmto_id'];
-                    if(!empty($data['data_de'])) $params['data_de'] = $data['data_de'];
-                    if(!empty($data['data_ate'])) $params['data_ate'] = $data['data_ate'];
+                    if (!empty($data['cliente_id'])) $params['cliente_id'] = $data['cliente_id'];
+                    if (!empty($data['funcionario_id'])) $params['funcionario_id'] = $data['funcionario_id'];
+                    if (!empty($data['forma_pgmto_id'])) $params['forma_pgmto_id'] = $data['forma_pgmto_id'];
+                    if (!empty($data['data_de'])) $params['data_de'] = $data['data_de'];
+                    if (!empty($data['data_ate'])) $params['data_ate'] = $data['data_ate'];
+                    if (!empty($data['detalhado'])) $params['detalhado'] = 1;
                     $queryString = http_build_query($params);
                     $url = route('relatorio.lucratividade.pdv') . ($queryString ? ('?' . $queryString) : '');
                     $livewire->js("window.open('{$url}', '_blank')");
-                })
+                }),
+
+            \Filament\Actions\Action::make('exportar_csv')
+                ->label('Exportar Excel (CSV)')
+                ->icon('heroicon-o-table-cells')
+                ->color('info')
+                ->form([
+                    \Filament\Forms\Components\Select::make('cliente_id')
+                        ->label('Cliente')
+                        ->options(fn () => \App\Models\Cliente::orderBy('nome')->pluck('nome', 'id')->toArray())
+                        ->searchable()
+                        ->placeholder('Todos'),
+                    \Filament\Forms\Components\Select::make('funcionario_id')
+                        ->label('Funcionário')
+                        ->options(fn () => \App\Models\Funcionario::orderBy('nome')->pluck('nome', 'id')->toArray())
+                        ->searchable()
+                        ->placeholder('Todos'),
+                    \Filament\Forms\Components\Select::make('forma_pgmto_id')
+                        ->label('Forma de Pagamento')
+                        ->options(fn () => \App\Models\FormaPgmto::orderBy('nome')->pluck('nome', 'id')->toArray())
+                        ->searchable()
+                        ->placeholder('Todas'),
+                    \Filament\Forms\Components\DatePicker::make('data_de')
+                        ->label('Data de'),
+                    \Filament\Forms\Components\DatePicker::make('data_ate')
+                        ->label('Data até'),
+                    \Filament\Forms\Components\Toggle::make('detalhado')
+                        ->label('Incluir produtos de cada venda')
+                        ->default(false),
+                ])
+                ->action(function (array $data, $livewire) {
+                    $params = array_filter([
+                        'cliente_id' => $data['cliente_id'] ?? null,
+                        'funcionario_id' => $data['funcionario_id'] ?? null,
+                        'forma_pgmto_id' => $data['forma_pgmto_id'] ?? null,
+                        'data_de' => $data['data_de'] ?? null,
+                        'data_ate' => $data['data_ate'] ?? null,
+                        'detalhado' => !empty($data['detalhado']) ? 1 : null,
+                    ]);
+                    $url = route('relatorio.lucratividade.pdv.csv') . ($params ? ('?' . http_build_query($params)) : '');
+                    $livewire->js("window.open('{$url}', '_blank')");
+                }),
         ];
     }
-
-
 }
